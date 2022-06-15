@@ -30,12 +30,18 @@ type Metadata struct {
 type SQLBackend interface {
 	OpenDB(dsn string) (*sql.DB, error)
 	VerifyDB(db *sql.DB) error
+
 	CreateDBTables(db *sql.DB) error
 	InitializeDBRows(db *sql.DB) error
+
 	GetMetadataForInode(db *sql.DB, inode int32) (Metadata, error)
+
 	GetDirectoryContentsForInode(db *sql.DB, inode int32) ([]int32, error)
+
 	GetFileContentsForInode(db *sql.DB, inode int32) ([]byte, error)
 	SetFileContentsForInode(db *sql.DB, inode int32, data []byte) error
+
+	CreateDirUnderInode(db *sql.DB, inode int32, dirName string) (int32, error)
 }
 
 type defaultBackend struct{}
@@ -60,7 +66,7 @@ func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 	defer metadataStmt.Close()
 
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = metadataStmt.Exec(1, os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, "/", 0)
+	_, err = metadataStmt.Exec(1, os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, "", 0)
 	if err != nil {
 		log.Println("Couldn't insert metadata rows!")
 		return err
@@ -263,4 +269,54 @@ func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []
 	}
 
 	return nil
+}
+
+func (d defaultBackend) CreateDirUnderInode(db *sql.DB, inode int32, dirName string) (int32, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		log.Println("Couldn't prepare tx for mkdir!")
+		return 0, err
+	}
+
+	metadataStmt, err := tx.Prepare(`insert into
+        metadata(uid,gid,mode,type,ctime,atime,mtime,name)
+        values (?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		log.Println("Couldn't create prepared statement for mkdir metadata rows!")
+		return 0, err
+	}
+	defer metadataStmt.Close()
+
+	var currentTimeNs = time.Now().UnixNano()
+	result, err := metadataStmt.Exec(os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, dirName)
+	if err != nil {
+		log.Println("Couldn't insert mkdir metadata rows!")
+		return 0, err
+	}
+	newDirInode, err := result.LastInsertId()
+	if err != nil {
+		log.Println("SQL Backend doesn't support sending LastInsertId :(")
+		return 0, err
+	}
+
+	parentStmt, err := tx.Prepare(`insert into parent values (?, ?)`)
+	if err != nil {
+		log.Println("Couldn't create prepared statement for mkdir parent rows!")
+		return 0, err
+	}
+	defer parentStmt.Close()
+
+	_, err = parentStmt.Exec(inode, newDirInode)
+	if err != nil {
+		log.Println("Couldn't insert mkdir parent rows!")
+		return 0, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println("Couldn't commit tx for mkdir!")
+		return 0, err
+	}
+
+	return int32(newDirInode), nil
 }

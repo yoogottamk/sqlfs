@@ -74,3 +74,17 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, res *fuse.Loo
 
 	return nil, fuse.ENOENT
 }
+
+var _ = fs.NodeMkdirer(&Dir{})
+
+func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error) {
+	inode, err := backend.CreateDirUnderInode(d.db, d.inode, req.Name)
+	if err != nil {
+		log.Println("Couldn't Mkdir!")
+		return nil, err
+	}
+
+	return &Dir{d.db, inode}, nil
+}
+
+// TODO: impl NodeOpener for Dir?

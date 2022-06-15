@@ -65,3 +65,10 @@ func (fh *FileHandle) Release(ctx context.Context, req *fuse.ReleaseRequest) err
 	// nothing to do
 	return nil
 }
+
+var _ = fs.NodeCreater(&File{})
+
+func (f *File) Create(ctx context.Context, req *fuse.CreateRequest, res *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	// TODO
+	return nil, nil, nil
+}
