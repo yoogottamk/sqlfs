@@ -16,7 +16,7 @@
 !sqlutils/init*.sql
 
 !README.md
-!LICENSE
+!.images/*
 
 # !Makefile
 
