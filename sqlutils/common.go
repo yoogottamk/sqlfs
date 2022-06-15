@@ -38,13 +38,9 @@ type SQLBackend interface {
 	SetFileContentsForInode(db *sql.DB, inode int32, data []byte) error
 }
 
-type DefaultBackend struct{}
+type defaultBackend struct{}
 
-func (d DefaultBackend) OpenDB(dsn string) (*sql.DB, error) {
-	panic("DefaultBackend should not be used!")
-}
-
-func (d DefaultBackend) InitializeDBRows(db *sql.DB) error {
+func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 	var defaultFileContents = []byte("Hello, World!\n")
 
 	tx, err := db.Begin()
@@ -112,7 +108,7 @@ func (d DefaultBackend) InitializeDBRows(db *sql.DB) error {
 	return nil
 }
 
-func (d DefaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, error) {
+func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, error) {
 	stmt, err := db.Prepare(
 		`select 
         inode,uid,gid,mode,type,ctime,atime,mtime,name,size 
@@ -153,7 +149,7 @@ func (d DefaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, 
 	}, nil
 }
 
-func (d DefaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([]int32, error) {
+func (d defaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([]int32, error) {
 	var childInodes []int32
 
 	rows, err := db.Query("select inode from parent where pinode = ?", inode)
@@ -181,7 +177,7 @@ func (d DefaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([
 	return childInodes, nil
 }
 
-func (d DefaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte, error) {
+func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte, error) {
 	var data []byte
 
 	stmt, err := db.Prepare("select data from filedata where inode = ?")
@@ -226,7 +222,7 @@ func (d DefaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 	return data, nil
 }
 
-func (d DefaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []byte) error {
+func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []byte) error {
 	tx, err := db.Begin()
 	if err != nil {
 		log.Println("Couldn't prepare tx for filedata update!")

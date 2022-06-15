@@ -8,7 +8,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type SQLiteBackend struct{ DefaultBackend }
+type SQLiteBackend struct{ defaultBackend }
 
 var _ SQLBackend = (*SQLiteBackend)(nil)
 
