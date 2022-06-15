@@ -87,4 +87,36 @@ func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error
 	return &Dir{d.db, inode}, nil
 }
 
+var _ = fs.NodeCreater(&Dir{})
+
+func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, res *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	// TODO: umask, flags, mode
+	var f File
+	f.db = d.db
+
+	inode, err := backend.CreateFileUnderInode(d.db, d.inode, req.Name)
+	if err != nil {
+		log.Println("Couldn't create file!")
+		return nil, nil, err
+	}
+	f.inode = inode
+
+	res.OpenResponse.Flags |= fuse.OpenNonSeekable
+	return &f, &FileHandle{d.db, f.inode, &f}, nil
+}
+
+var _ = fs.NodeRemover(&Dir{})
+
+func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
+	var err error
+
+	if req.Dir {
+		err = backend.RemoveDirUnderInode(d.db, d.inode, req.Name)
+	} else {
+		err = backend.RemoveFileUnderInode(d.db, d.inode, req.Name)
+	}
+
+	return err
+}
+
 // TODO: impl NodeOpener for Dir?
