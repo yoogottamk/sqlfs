@@ -56,8 +56,6 @@ type SQLBackend interface {
 type defaultBackend struct{}
 
 func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
-	var defaultFileContents = []byte("Hello, World!\n")
-
 	tx, err := db.Begin()
 	if err != nil {
 		log.Println("Couldn't prepare tx for initial rows!")
@@ -66,8 +64,8 @@ func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 
 	// add metadata entries for / and /testfile
 	metadataStmt, err := tx.Prepare(`insert into 
-        metadata(inode,uid,gid,mode,type,ctime,atime,mtime,name,size) 
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        metadata(inode,uid,gid,mode,type,ctime,atime,mtime,name)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		log.Println("Couldn't create prepared statement for metadata rows!")
 		return err
@@ -75,42 +73,9 @@ func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 	defer metadataStmt.Close()
 
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = metadataStmt.Exec(1, os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, "", 0)
+	_, err = metadataStmt.Exec(1, os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, "")
 	if err != nil {
 		log.Println("Couldn't insert metadata rows!")
-		return err
-	}
-	_, err = metadataStmt.Exec(2, os.Getuid(), os.Getgid(), 0644, fuse.DT_File, currentTimeNs, currentTimeNs, currentTimeNs, "testfile", len(defaultFileContents))
-	if err != nil {
-		log.Println("Couldn't insert metadata rows!")
-		return err
-	}
-
-	// add contents for /testfile
-	contentStmt, err := tx.Prepare(`insert into filedata values (?, ?)`)
-	if err != nil {
-		log.Println("Couldn't create prepared statement for filedata rows!")
-		return err
-	}
-	defer contentStmt.Close()
-
-	_, err = contentStmt.Exec(2, defaultFileContents)
-	if err != nil {
-		log.Println("Couldn't insert filedata rows!")
-		return err
-	}
-
-	// add contents for parent table
-	parentStmt, err := tx.Prepare(`insert into parent values (?, ?)`)
-	if err != nil {
-		log.Println("Couldn't create prepared statement for parent rows!")
-		return err
-	}
-	defer parentStmt.Close()
-
-	_, err = parentStmt.Exec(1, 2)
-	if err != nil {
-		log.Println("Couldn't insert parent rows!")
 		return err
 	}
 
@@ -214,7 +179,7 @@ func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 		return data, err
 	}
 
-	metadataStmt, err := tx.Prepare(`update metadata set atime = ? where inode = ?`)
+	metadataStmt, err := tx.Prepare("update metadata set atime = ? where inode = ?")
 	if err != nil {
 		log.Println("Couldn't create prepared statement for metadata update!")
 		return data, err
@@ -244,7 +209,7 @@ func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []
 		return err
 	}
 
-	dataStmt, err := tx.Prepare(`update filedata set data = ? where inode = ?`)
+	dataStmt, err := tx.Prepare("update filedata set data = ? where inode = ?")
 	if err != nil {
 		log.Println("Couldn't create prepared statement for filedata update!")
 		return err
@@ -257,7 +222,7 @@ func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []
 		return err
 	}
 
-	metadataStmt, err := tx.Prepare(`update metadata set size = ?, mtime = ? where inode = ?`)
+	metadataStmt, err := tx.Prepare("update metadata set size = ?, mtime = ? where inode = ?")
 	if err != nil {
 		log.Println("Couldn't create prepared statement for metadata update!")
 		return err
@@ -318,7 +283,7 @@ func (d defaultBackend) CreateFileUnderInode(db *sql.DB, inode int32, name strin
 		return 0, err
 	}
 
-	contentStmt, err := tx.Prepare(`insert into filedata values (?, ?)`)
+	contentStmt, err := tx.Prepare("insert into filedata values (?, ?)")
 	if err != nil {
 		log.Println("Couldn't create prepared statement for create file data rows!")
 		return 0, err
@@ -408,7 +373,7 @@ func (d defaultBackend) RemoveFileUnderInode(db *sql.DB, inode int32, name strin
 	}
 
 	// delete from filedata
-	contentStmt, err := tx.Prepare(`delete from filedata where inode = ?`)
+	contentStmt, err := tx.Prepare("delete from filedata where inode = ?")
 	if err != nil {
 		log.Println("Couldn't create prepared statement for filedata removal!")
 		return err
@@ -475,7 +440,7 @@ func insertIntoMetadata(tx *sql.Tx, mode, type_ int64, name string) (int32, erro
 }
 
 func insertIntoParent(tx *sql.Tx, parentInode, childInode int64) error {
-	parentStmt, err := tx.Prepare(`insert into parent values (?, ?)`)
+	parentStmt, err := tx.Prepare("insert into parent values (?, ?)")
 	if err != nil {
 		log.Println("Couldn't create prepared statement for mkdir parent rows!")
 		return err
