@@ -2,6 +2,7 @@ package sqlutils
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"os"
 	"syscall"
@@ -54,6 +55,22 @@ type SQLBackend interface {
 }
 
 type defaultBackend struct{}
+
+// Pretty basic check for whether the necessary tables were created.
+// This check might pass and later operations still might fail.
+func (d defaultBackend) VerifyDB(db *sql.DB) error {
+	var rootName string
+	err := db.QueryRow("select name from metadata where inode = ?", 1).Scan(&rootName)
+	if err != nil {
+		return err
+	}
+
+	if rootName != "" {
+		return errors.New("Expected to find entry with empty name for inode=1 in metadata")
+	}
+
+	return nil
+}
 
 func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 	tx, err := db.Begin()

@@ -19,11 +19,6 @@ func (s SQLiteBackend) OpenDB(dsn string) (*sql.DB, error) {
 	return sql.Open("sqlite3", dsn)
 }
 
-func (s SQLiteBackend) VerifyDB(db *sql.DB) error {
-	// TODO: check if loaded sql file is usable
-	return nil
-}
-
 func (s SQLiteBackend) CreateDBTables(db *sql.DB) error {
 	_, err := db.Exec(createTableSql)
 	if err != nil {
