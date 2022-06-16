@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"bazil.org/fuse"
-
-	"github.com/yoogottamk/sqlfs/sqlutils"
 )
 
 // filesystem
@@ -41,7 +39,13 @@ type File struct {
 var _ fs.Node = (*Dir)(nil)
 var _ fs.Node = (*File)(nil)
 
-func setAttrFromMetadata(metadata *sqlutils.Metadata, attr *fuse.Attr) {
+func setAttrFromMetadata(db *sql.DB, inode int32, attr *fuse.Attr) error {
+	metadata, err := backend.GetMetadataForInode(db, inode)
+	if err != nil {
+		log.Println("Failed to update metadata for dir!")
+		return err
+	}
+
 	attr.Uid = uint32(metadata.Uid)
 	attr.Gid = uint32(metadata.Gid)
 	attr.Mode = os.FileMode(metadata.Mode)
@@ -49,25 +53,16 @@ func setAttrFromMetadata(metadata *sqlutils.Metadata, attr *fuse.Attr) {
 	attr.Mtime = time.Unix(metadata.Mtime/1e9, metadata.Mtime%1e9)
 	attr.Atime = time.Unix(metadata.Atime/1e9, metadata.Atime%1e9)
 	attr.Size = uint64(metadata.Size)
-}
 
-func (d *Dir) Attr(ctx context.Context, attr *fuse.Attr) error {
-	metadata, err := backend.GetMetadataForInode(d.db, int32(d.inode))
-	if err != nil {
-		log.Println("Failed to update metadata for dir!")
-		return err
-	}
-
-	setAttrFromMetadata(&metadata, attr)
 	return nil
 }
-func (f *File) Attr(ctx context.Context, attr *fuse.Attr) error {
-	metadata, err := backend.GetMetadataForInode(f.db, int32(f.inode))
-	if err != nil {
-		log.Println("Failed to update metadata for file!")
-		return err
-	}
 
-	setAttrFromMetadata(&metadata, attr)
-	return nil
+func (d *Dir) Attr(ctx context.Context, attr *fuse.Attr) (err error) {
+	err = setAttrFromMetadata(d.db, d.inode, attr)
+	return
+}
+
+func (f *File) Attr(ctx context.Context, attr *fuse.Attr) (err error) {
+	err = setAttrFromMetadata(f.db, f.inode, attr)
+	return
 }
