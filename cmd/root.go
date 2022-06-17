@@ -27,15 +27,17 @@ var rootCmd = &cobra.Command{
 
 Available backends: %s
 
-DSN for sqlite: filepath
-DSN for mysql: [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
+* DSN for sqlite: filepath
+
+* DSN for mysql: [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 
     For example, if mysql is running on localhost and
     username=user, password=password and dbname is sqlfs, DSN would be:
 
         user:password@/sqlfs
 
-    More information can be found here: https://github.com/go-sql-driver/mysql`,
+    More information can be found here: https://github.com/go-sql-driver/mysql
+`,
 		availableBackends),
 }
 
