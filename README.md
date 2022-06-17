@@ -2,12 +2,24 @@
 A fuse filesystem that stores data on an sqlite db.
 
 ## How to run
+The default settings create a sqlite database, named `fs.sql` in the current directory. To know more, run `./sqlfs`. In particular, look at `-b` and `-d`
+
 ```sh
 go build
 mkdir mnt
-./sqlfs fs.sql mnt
 
-# ... after you're done, ^C and run:
+# initialize the db
+./sqlfs init
+
+# mounts the fuse fs
+./sqlfs mount
+# keep this running^
+
+# open a new terminal and
+cd mnt
+
+# create, remove files and dirs, read and write files, ...
+# ... after you're done, run:
 umount mnt
 ```
 
@@ -15,9 +27,9 @@ umount mnt
 ![demo](./.images/demo.png)
 
 ## TODO
+- divide file contents into blocks
 - symlinks
 - `.`, `..` in directory listing (`cd ..` works but `.`, `..` aren't shown in `ls -a`)
-- support for other sql backends (e.g. mysql, postgres)
 
 ## Why?
 Why not? 🙃
