@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"log"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -17,7 +18,17 @@ var _ SQLBackend = (*MySQLBackend)(nil)
 var createTableMySql string
 
 func (m MySQLBackend) OpenDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", dsn+"?multiStatements=true")
+	var querySep string
+
+	if strings.Contains(dsn, "?") {
+		// some options were already provided
+		querySep = "&"
+	} else {
+		// no options were provided
+		querySep = "?"
+	}
+
+	db, err := sql.Open("mysql", dsn+querySep+"multiStatements=true")
 	if err != nil {
 		return nil, err
 	}
