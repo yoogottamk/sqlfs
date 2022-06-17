@@ -15,7 +15,7 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	var ret []fuse.Dirent
 
 	var currentInode = d.inode
-	childInodes, err := backend.GetDirectoryContentsForInode(d.db, int32(currentInode))
+	childInodes, err := Backend.GetDirectoryContentsForInode(d.db, int32(currentInode))
 	if err != nil {
 		log.Println(err)
 		return ret, fuse.ENOENT
@@ -24,7 +24,7 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	for _, childInode := range childInodes {
 		var dirent fuse.Dirent
 
-		metadata, err := backend.GetMetadataForInode(d.db, childInode)
+		metadata, err := Backend.GetMetadataForInode(d.db, childInode)
 		if err == nil {
 			dirent.Inode = uint64(childInode)
 			dirent.Name = metadata.Name
@@ -55,7 +55,7 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, res *fuse.Loo
 		if dirent.Name == path {
 			// yeah, looking up the db twice :(
 			// TODO: make it faster. extract relevant stuff from ReadDirAll
-			metadata, err := backend.GetMetadataForInode(d.db, int32(dirent.Inode))
+			metadata, err := Backend.GetMetadataForInode(d.db, int32(dirent.Inode))
 			if err != nil {
 				log.Println("Couldn't get metadata for inode!")
 				return nil, fuse.ENOENT
@@ -78,7 +78,7 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, res *fuse.Loo
 var _ = fs.NodeMkdirer(&Dir{})
 
 func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error) {
-	inode, err := backend.CreateDirUnderInode(d.db, d.inode, req.Name)
+	inode, err := Backend.CreateDirUnderInode(d.db, d.inode, req.Name)
 	if err != nil {
 		log.Println("Couldn't Mkdir!")
 		return nil, err
@@ -94,7 +94,7 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, res *fuse.Cre
 	var f File
 	f.db = d.db
 
-	inode, err := backend.CreateFileUnderInode(d.db, d.inode, req.Name)
+	inode, err := Backend.CreateFileUnderInode(d.db, d.inode, req.Name)
 	if err != nil {
 		log.Println("Couldn't create file!")
 		return nil, nil, err
@@ -111,9 +111,9 @@ func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 	var err error
 
 	if req.Dir {
-		err = backend.RemoveDirUnderInode(d.db, d.inode, req.Name)
+		err = Backend.RemoveDirUnderInode(d.db, d.inode, req.Name)
 	} else {
-		err = backend.RemoveFileUnderInode(d.db, d.inode, req.Name)
+		err = Backend.RemoveFileUnderInode(d.db, d.inode, req.Name)
 	}
 
 	return err

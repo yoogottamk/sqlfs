@@ -19,7 +19,7 @@ type FS struct {
 var _ fs.FS = (*FS)(nil)
 
 func (f *FS) Root() (fs.Node, error) {
-	metadata, err := backend.GetMetadataForInode(f.db, 1)
+	metadata, err := Backend.GetMetadataForInode(f.db, 1)
 	if err != nil {
 		return &Dir{}, err
 	}
@@ -40,7 +40,7 @@ var _ fs.Node = (*Dir)(nil)
 var _ fs.Node = (*File)(nil)
 
 func setAttrFromMetadata(db *sql.DB, inode int32, attr *fuse.Attr) error {
-	metadata, err := backend.GetMetadataForInode(db, inode)
+	metadata, err := Backend.GetMetadataForInode(db, inode)
 	if err != nil {
 		log.Println("Failed to update metadata for dir!")
 		return err

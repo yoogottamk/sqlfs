@@ -20,7 +20,7 @@ var _ = fs.HandleReader(&FileHandle{})
 var _ = fs.HandleWriter(&FileHandle{})
 
 func (fh *FileHandle) Read(ctx context.Context, req *fuse.ReadRequest, res *fuse.ReadResponse) error {
-	data, err := backend.GetFileContentsForInode(fh.db, fh.inode)
+	data, err := Backend.GetFileContentsForInode(fh.db, fh.inode)
 	if err != nil {
 		log.Println("Couldn't read file contents!")
 		return err
@@ -32,14 +32,14 @@ func (fh *FileHandle) Read(ctx context.Context, req *fuse.ReadRequest, res *fuse
 }
 
 func (fh *FileHandle) Write(ctx context.Context, req *fuse.WriteRequest, res *fuse.WriteResponse) error {
-	data, err := backend.GetFileContentsForInode(fh.db, fh.inode)
+	data, err := Backend.GetFileContentsForInode(fh.db, fh.inode)
 	if err != nil {
 		log.Println("Couldn't read file contents!")
 		return err
 	}
 
 	newData := append(data[:req.Offset], req.Data...)
-	err = backend.SetFileContentsForInode(fh.db, fh.inode, newData)
+	err = Backend.SetFileContentsForInode(fh.db, fh.inode, newData)
 	if err != nil {
 		log.Println("Failed to write to file!")
 		return err

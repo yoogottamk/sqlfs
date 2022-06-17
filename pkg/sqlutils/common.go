@@ -11,6 +11,11 @@ import (
 	"bazil.org/fuse"
 )
 
+var AvaialableBackends = map[string]SQLBackend{
+	"sqlite": SQLiteBackend{},
+	"mysql":  MySQLBackend{},
+}
+
 // metadata table as go struct
 type Metadata struct {
 	Inode int64
@@ -58,6 +63,8 @@ type defaultBackend struct{}
 
 // Pretty basic check for whether the necessary tables were created.
 // This check might pass and later operations still might fail.
+//
+// TODO: do more extensive checks
 func (d defaultBackend) VerifyDB(db *sql.DB) error {
 	var rootName string
 	err := db.QueryRow("select name from metadata where inode = ?", 1).Scan(&rootName)

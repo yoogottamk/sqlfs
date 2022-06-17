@@ -13,14 +13,14 @@ type SQLiteBackend struct{ defaultBackend }
 var _ SQLBackend = (*SQLiteBackend)(nil)
 
 //go:embed init-sqlite3.sql
-var createTableSql string
+var createTableSqlite3 string
 
 func (s SQLiteBackend) OpenDB(dsn string) (*sql.DB, error) {
 	return sql.Open("sqlite3", dsn)
 }
 
 func (s SQLiteBackend) CreateDBTables(db *sql.DB) error {
-	_, err := db.Exec(createTableSql)
+	_, err := db.Exec(createTableSqlite3)
 	if err != nil {
 		log.Println("Couldn't write initial tables!")
 		return err
