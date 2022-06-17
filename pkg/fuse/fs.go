@@ -13,17 +13,17 @@ import (
 
 // filesystem
 type FS struct {
-	db *sql.DB
+	Db *sql.DB
 }
 
 var _ fs.FS = (*FS)(nil)
 
 func (f *FS) Root() (fs.Node, error) {
-	metadata, err := Backend.GetMetadataForInode(f.db, 1)
+	metadata, err := Backend.GetMetadataForInode(f.Db, 1)
 	if err != nil {
 		return &Dir{}, err
 	}
-	return &Dir{f.db, int32(metadata.Inode)}, nil
+	return &Dir{f.Db, int32(metadata.Inode)}, nil
 }
 
 // directories, files
