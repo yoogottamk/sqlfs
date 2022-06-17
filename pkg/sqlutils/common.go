@@ -14,6 +14,7 @@ import (
 var AvaialableBackends = map[string]SQLBackend{
 	"sqlite": SQLiteBackend{},
 	"mysql":  MySQLBackend{},
+	// "postgres": PostgresBackend{},
 }
 
 // metadata table as go struct
@@ -86,18 +87,13 @@ func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 		return err
 	}
 
-	// add metadata entries for / and /testfile
-	metadataStmt, err := tx.Prepare(`insert into 
-        metadata(inode,uid,gid,mode,type,ctime,atime,mtime,name)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		log.Println("Couldn't create prepared statement for metadata rows!")
-		return err
-	}
-	defer metadataStmt.Close()
-
+	// add metadata entries for /
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = metadataStmt.Exec(1, os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, "")
+	_, err = tx.Exec(`insert into
+        metadata(inode,uid,gid,mode,type,ctime,atime,mtime,name)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		1, os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, "",
+	)
 	if err != nil {
 		log.Println("Couldn't insert metadata rows!")
 		return err
@@ -113,17 +109,6 @@ func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 }
 
 func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, error) {
-	stmt, err := db.Prepare(
-		`select 
-        inode,uid,gid,mode,type,ctime,atime,mtime,name,size 
-        from metadata where inode = ?`,
-	)
-	if err != nil {
-		log.Println("Couldn't prepare select statement for dir Attr lookup")
-		return Metadata{}, err
-	}
-	defer stmt.Close()
-
 	var uid int64
 	var gid int64
 	var mode int64
@@ -133,9 +118,14 @@ func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, 
 	var mtime int64
 	var name string
 	var size int64
-	err = stmt.QueryRow(inode).Scan(&inode, &uid, &gid, &mode, &type_, &ctime, &atime, &mtime, &name, &size)
+
+	err := db.QueryRow(
+		`select
+        inode,uid,gid,mode,type,ctime,atime,mtime,name,size
+        from metadata where inode = ?`, inode,
+	).Scan(&inode, &uid, &gid, &mode, &type_, &ctime, &atime, &mtime, &name, &size)
 	if err != nil {
-		log.Println("Coulnd't query select statement for dir Attr lookup")
+		log.Println("Coulnd't query select statement for Attr lookup")
 		return Metadata{}, err
 	}
 
@@ -184,14 +174,7 @@ func (d defaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([
 func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte, error) {
 	var data []byte
 
-	stmt, err := db.Prepare("select data from filedata where inode = ?")
-	if err != nil {
-		log.Println("Couldn't prepare statement to get filedata!")
-		return data, err
-	}
-	defer stmt.Close()
-
-	err = stmt.QueryRow(inode).Scan(&data)
+	err := db.QueryRow("select data from filedata where inode = ?", inode).Scan(&data)
 	if err != nil {
 		log.Println("Couldn't get filedata!")
 		return data, err
@@ -203,15 +186,8 @@ func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 		return data, err
 	}
 
-	metadataStmt, err := tx.Prepare("update metadata set atime = ? where inode = ?")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for metadata update!")
-		return data, err
-	}
-	defer metadataStmt.Close()
-
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = metadataStmt.Exec(currentTimeNs, inode)
+	_, err = tx.Exec("update metadata set atime = ? where inode = ?", currentTimeNs, inode)
 	if err != nil {
 		log.Println("Couldn't update data for metadata row!")
 		return data, err
@@ -233,28 +209,14 @@ func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []
 		return err
 	}
 
-	dataStmt, err := tx.Prepare("update filedata set data = ? where inode = ?")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for filedata update!")
-		return err
-	}
-	defer dataStmt.Close()
-
-	_, err = dataStmt.Exec(data, inode)
+	_, err = tx.Exec("update filedata set data = ? where inode = ?", data, inode)
 	if err != nil {
 		log.Println("Couldn't update data for filedata row!")
 		return err
 	}
 
-	metadataStmt, err := tx.Prepare("update metadata set size = ?, mtime = ? where inode = ?")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for metadata update!")
-		return err
-	}
-	defer metadataStmt.Close()
-
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = metadataStmt.Exec(len(data), currentTimeNs, inode)
+	_, err = tx.Exec("update metadata set size = ?, mtime = ? where inode = ?", len(data), currentTimeNs, inode)
 	if err != nil {
 		log.Println("Couldn't update data for metadata row!")
 		return err
@@ -307,13 +269,7 @@ func (d defaultBackend) CreateFileUnderInode(db *sql.DB, inode int32, name strin
 		return 0, err
 	}
 
-	contentStmt, err := tx.Prepare("insert into filedata values (?, ?)")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for create file data rows!")
-		return 0, err
-	}
-	defer contentStmt.Close()
-	_, err = contentStmt.Exec(newFileInode, []byte(""))
+	_, err = tx.Exec("insert into filedata values (?, ?)", newFileInode, []byte(""))
 	if err != nil {
 		log.Println("Couldn't insert create file data rows!")
 		return 0, err
@@ -397,13 +353,7 @@ func (d defaultBackend) RemoveFileUnderInode(db *sql.DB, inode int32, name strin
 	}
 
 	// delete from filedata
-	contentStmt, err := tx.Prepare("delete from filedata where inode = ?")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for filedata removal!")
-		return err
-	}
-	defer contentStmt.Close()
-	_, err = contentStmt.Exec(childInode)
+	_, err = tx.Exec("delete from filedata where inode = ?", childInode)
 	if err != nil {
 		log.Println("Couldn't remove filedata rows!")
 		return err
@@ -439,21 +389,17 @@ func getInodeFromNameUnderDir(db *sql.DB, parentInode int32, name string) (int32
 }
 
 func insertIntoMetadata(tx *sql.Tx, mode, type_ int64, name string) (int32, error) {
-	metadataStmt, err := tx.Prepare(`insert into
-        metadata(uid,gid,mode,type,ctime,atime,mtime,name)
-        values (?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		log.Println("Couldn't create prepared statement for mkdir metadata rows!")
-		return 0, err
-	}
-	defer metadataStmt.Close()
-
 	var currentTimeNs = time.Now().UnixNano()
-	result, err := metadataStmt.Exec(os.Getuid(), os.Getgid(), mode, type_, currentTimeNs, currentTimeNs, currentTimeNs, name)
+	result, err := tx.Exec(`insert into
+        metadata(uid,gid,mode,type,ctime,atime,mtime,name)
+        values (?, ?, ?, ?, ?, ?, ?, ?)`,
+		os.Getuid(), os.Getgid(), mode, type_, currentTimeNs, currentTimeNs, currentTimeNs, name,
+	)
 	if err != nil {
 		log.Println("Couldn't insert mkdir metadata rows!")
 		return 0, err
 	}
+
 	newInode, err := result.LastInsertId()
 	if err != nil {
 		log.Println("SQL Backend doesn't support sending LastInsertId :(")
@@ -464,14 +410,7 @@ func insertIntoMetadata(tx *sql.Tx, mode, type_ int64, name string) (int32, erro
 }
 
 func insertIntoParent(tx *sql.Tx, parentInode, childInode int64) error {
-	parentStmt, err := tx.Prepare("insert into parent values (?, ?)")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for mkdir parent rows!")
-		return err
-	}
-	defer parentStmt.Close()
-
-	_, err = parentStmt.Exec(parentInode, childInode)
+	_, err := tx.Exec("insert into parent values (?, ?)", parentInode, childInode)
 	if err != nil {
 		log.Println("Couldn't insert mkdir parent rows!")
 		return err
@@ -481,13 +420,7 @@ func insertIntoParent(tx *sql.Tx, parentInode, childInode int64) error {
 }
 
 func removeFromMetadata(tx *sql.Tx, inode int64) error {
-	metadataStmt, err := tx.Prepare("delete from metadata where inode = ?")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for metadata removal!")
-		return err
-	}
-	defer metadataStmt.Close()
-	_, err = metadataStmt.Exec(inode)
+	_, err := tx.Exec("delete from metadata where inode = ?", inode)
 	if err != nil {
 		log.Println("Couldn't remove file metadata rows!")
 		return err
@@ -497,13 +430,7 @@ func removeFromMetadata(tx *sql.Tx, inode int64) error {
 }
 
 func removeFromParent(tx *sql.Tx, parentInode, childInode int64) error {
-	parentStmt, err := tx.Prepare("delete from parent where pinode = ? and inode = ?")
-	if err != nil {
-		log.Println("Couldn't create prepared statement for parent row removal!")
-		return err
-	}
-	defer parentStmt.Close()
-	_, err = parentStmt.Exec(parentInode, childInode)
+	_, err := tx.Exec("delete from parent where pinode = ? and inode = ?", parentInode, childInode)
 	if err != nil {
 		log.Println("Couldn't remove parent rows!")
 		return err
