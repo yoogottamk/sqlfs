@@ -2,7 +2,7 @@
 A fuse filesystem that stores data on an SQL dbs.
 
 ## How to run
-By default, this creates a sqlite database named `fs.sql` in the current directory. To know more or use other sql dbs, run `./sqlfs`.
+By default, this creates a sqlite database named `fs.sql` in the current directory. To know more or use other sql dbs, run `sqlfs`.
 
 ```sh
 go install github.com/yoogottamk/sqlfs@latest
@@ -32,6 +32,8 @@ umount mnt
 - divide file contents into blocks
 - symlinks
 - `.`, `..` in directory listing (`cd ..` works but `.`, `..` aren't shown in `ls -a`)
+
+^listed in the order of priority
 
 ## Why?
 Why not? 🙃
