@@ -13,7 +13,7 @@
 !*.go
 !go.sum
 !go.mod
-!sqlutils/init*.sql
+!pkg/sqlutils/init*.sql
 
 !README.md
 !.images/*

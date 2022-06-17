@@ -1,8 +1,8 @@
 # `sqlfs`
-A fuse filesystem that stores data on an sqlite db.
+A fuse filesystem that stores data on an SQL dbs.
 
 ## How to run
-The default settings create a sqlite database, named `fs.sql` in the current directory. To know more, run `./sqlfs`. In particular, look at `-b` and `-d`
+The default flags create a sqlite database, named `fs.sql` in the current directory. To know more, run `./sqlfs`. In particular, look at global flags `-b` and `-d`.
 
 ```sh
 go build
@@ -27,6 +27,8 @@ umount mnt
 ![demo](./.images/demo.png)
 
 ## TODO
+- tests
+- docs
 - divide file contents into blocks
 - symlinks
 - `.`, `..` in directory listing (`cd ..` works but `.`, `..` aren't shown in `ls -a`)
