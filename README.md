@@ -2,17 +2,17 @@
 A fuse filesystem that stores data on an SQL dbs.
 
 ## How to run
-The default flags create a sqlite database, named `fs.sql` in the current directory. To know more, run `./sqlfs`. In particular, look at global flags `-b` and `-d`.
+By default, this creates a sqlite database named `fs.sql` in the current directory. To know more or use other sql dbs, run `./sqlfs`.
 
 ```sh
-go build
+go install github.com/yoogottamk/sqlfs@latest
 mkdir mnt
 
 # initialize the db
-./sqlfs init
+sqlfs init
 
 # mounts the fuse fs
-./sqlfs mount
+sqlfs mount
 # keep this running^
 
 # open a new terminal and

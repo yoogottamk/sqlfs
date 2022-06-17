@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -11,26 +13,45 @@ import (
 	"github.com/yoogottamk/sqlfs/pkg/sqlutils"
 )
 
-var sqlBackend string
+var sqlURI string
 var sqlDSN string
+
+var availableBackends = reflect.ValueOf(sqlutils.AvaialableBackends).MapKeys()
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:              "sqlfs",
 	Short:            "FUSE fs built on sql",
 	PersistentPreRun: setFuseBackendFromFlag,
-	Long: `A FUSE filesystem that stores information on SQL databases.
+	Long: fmt.Sprintf(`A FUSE filesystem that stores information on SQL databases.
 
-Currently only works with sqlite and mysql.`,
+Available backends: %s
+
+DSN for sqlite: filepath
+DSN for mysql: [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
+
+    For example, if mysql is running on localhost and
+    username=user, password=password and dbname is sqlfs, DSN would be:
+
+        user:password@/sqlfs
+
+    More information can be found here: https://github.com/go-sql-driver/mysql`,
+		availableBackends),
 }
 
 // set fuse backend from flag
 func setFuseBackendFromFlag(cmd *cobra.Command, args []string) {
+	if !strings.Contains(sqlURI, "://") {
+		log.Fatalf(`uri must be of the form backend://dsn`)
+	}
+
+	uriParts := strings.Split(sqlURI, "://")
+	sqlBackend := uriParts[0]
+	sqlDSN = uriParts[1]
+
 	backend, ok := sqlutils.AvaialableBackends[sqlBackend]
 	if !ok {
-		log.Fatalf("Unknown backend `%s`. Available backends: %s",
-			sqlBackend,
-			reflect.ValueOf(sqlutils.AvaialableBackends).MapKeys())
+		log.Fatalf("Unknown backend `%s`. Available backends: %s", sqlURI, availableBackends)
 	}
 
 	fuse.Backend = backend
@@ -46,6 +67,5 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&sqlBackend, "backend", "b", "sqlite", "SQL backend to use [mysql|sqlite]")
-	rootCmd.PersistentFlags().StringVarP(&sqlDSN, "dsn", "d", "fs.sql", "The DSN for connecting to the sql backend")
+	rootCmd.PersistentFlags().StringVarP(&sqlURI, "uri", "u", "sqlite://fs.sql", "SQL URI to connect to [backend://dsn]")
 }
