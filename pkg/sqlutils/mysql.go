@@ -14,7 +14,7 @@ type MySQLBackend struct{ defaultBackend }
 
 var _ SQLBackend = (*MySQLBackend)(nil)
 
-//go:embed init-generic.sql
+//go:embed init-mysql.sql
 var createTableMySql string
 
 func (m MySQLBackend) OpenDB(dsn string) (*sql.DB, error) {
