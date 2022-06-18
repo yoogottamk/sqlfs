@@ -1,14 +1,18 @@
-package cmd
+package fuse
 
 import (
+	"context"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"bazil.org/fuse/fs/fstestutil"
+	"github.com/docker/go-connections/nat"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/yoogottamk/sqlfs/pkg/fuse"
 	"github.com/yoogottamk/sqlfs/pkg/sqlutils"
 )
 
@@ -26,10 +30,8 @@ func assertFileSizeIs(t *testing.T, filepath string, expectedSize int64) {
 	}
 }
 
-func getMountedFS(t *testing.T, backend sqlutils.SQLBackend) *fstestutil.Mount {
-	fuse.Backend = backend
-
-	dsn := t.TempDir() + "/fs.sql"
+func getMountedFS(t *testing.T, backend sqlutils.SQLBackend, dsn string) *fstestutil.Mount {
+	Backend = backend
 
 	t.Logf("Using dsn '%s'", dsn)
 
@@ -48,7 +50,7 @@ func getMountedFS(t *testing.T, backend sqlutils.SQLBackend) *fstestutil.Mount {
 		t.Fatalf("Couldn't create initial rows: %v", err)
 	}
 
-	filesys := fuse.FS{Db: db}
+	filesys := FS{db}
 	mnt, err := fstestutil.MountedT(t, &filesys, nil)
 	if err != nil {
 		t.Fatalf("Couldn't mount sqlfs: %v", err)
@@ -105,14 +107,49 @@ func testBasicFileOperations(t *testing.T, mnt *fstestutil.Mount) {
 	assertFileSizeIs(t, testfile, 0)
 }
 
-func TestBasicMountSqlite(t *testing.T) {
-	mnt := getMountedFS(t, sqlutils.SQLiteBackend{})
-	mnt.Close()
-}
+func setupMySQLContainer(t *testing.T) string {
+	ctx := context.Background()
 
-func TestBasicFileOperationsSqlite(t *testing.T) {
-	mnt := getMountedFS(t, sqlutils.SQLiteBackend{})
-	defer mnt.Close()
+	user := "user"
+	password := "password"
+	dbname := "sqlfs"
 
-	testBasicFileOperations(t, mnt)
+	req := testcontainers.ContainerRequest{
+		Image:        "mariadb:latest",
+		ExposedPorts: []string{"3306/tcp"},
+		Env: map[string]string{
+			"MARIADB_USER":                 user,
+			"MARIADB_PASSWORD":             password,
+			"MARIADB_DATABASE":             dbname,
+			"MARIADB_RANDOM_ROOT_PASSWORD": "yes",
+		},
+		// TODO: maybe use wait.ForSQL?
+		WaitingFor: wait.ForListeningPort(nat.Port("3306")),
+	}
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		t.Fatalf("Couldn't start mysql container: %v", err)
+	}
+
+	ip, err := container.Host(ctx)
+	if err != nil {
+		t.Fatalf("Couldn't get ip for mysql container: %v", err)
+	}
+
+	mappedPort, err := container.MappedPort(ctx, "3306")
+	if err != nil {
+		t.Fatalf("Couldn't get mapped port for mysql container: %v", err)
+	}
+
+	dsn := fmt.Sprintf("%s:%s@(%s:%s)/%s", user, password, ip, mappedPort.Port(), dbname)
+
+	// NOTE: not terminating container myself
+	// this was done to simplify the testing interface
+	//
+	// relying on testcontainer's reaper
+	// https://golang.testcontainers.org/features/garbage_collector/
+	return dsn
 }
