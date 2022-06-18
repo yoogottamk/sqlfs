@@ -30,6 +30,7 @@ umount mnt
 - docs
 - divide file contents into blocks
 - symlinks
+- figure out logging
 - `.`, `..` in directory listing (`cd ..` works but `.`, `..` aren't shown in `ls -a`)
 - more extensive tests [have basic e2e file and dir operations being tested right now, need to verify stuff at sql tables level]
 

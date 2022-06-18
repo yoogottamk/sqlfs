@@ -98,7 +98,26 @@ func testBasicFileOperations(t *testing.T, mnt *fstestutil.Mount) {
 		assertFileSizeIs(t, testfile, 2*int64(len(initialContents)))
 	})
 
-	t.Run("truncate", func(t *testing.T) {
+	t.Run("truncate-read", func(t *testing.T) {
+		err := os.Truncate(testfile, int64(len(initialContents)))
+		if err != nil {
+			t.Fatalf("Couldn't truncate file: %v", err)
+		}
+
+		// verify contents
+		contents, err := ioutil.ReadFile(testfile)
+		if err != nil {
+			t.Fatalf("Couldn't read from file: %v", err)
+		}
+		if string(contents) != initialContents {
+			t.Fatalf("Wrong contents read from file")
+		}
+
+		// verify size
+		assertFileSizeIs(t, testfile, int64(len(initialContents)))
+	})
+
+	t.Run("truncate-full", func(t *testing.T) {
 		err := os.Truncate(testfile, 0)
 		if err != nil {
 			t.Fatalf("Couldn't truncate file: %v", err)

@@ -43,6 +43,7 @@ type SQLBackend interface {
 	InitializeDBRows(db *sql.DB) error
 
 	GetMetadataForInode(db *sql.DB, inode int32) (Metadata, error)
+	SetMetadataForInode(db *sql.DB, inode int32, metadata Metadata) error
 
 	GetDirectoryContentsForInode(db *sql.DB, inode int32) ([]int32, error)
 
@@ -143,6 +144,32 @@ func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, 
 	}, nil
 }
 
+func (d defaultBackend) SetMetadataForInode(db *sql.DB, inode int32, metadata Metadata) error {
+	tx, err := db.Begin()
+	if err != nil {
+		log.Println("Couldn't prepare tx for metadata update!")
+		return err
+	}
+	_, err = tx.Exec(`update metadata
+        set uid = ?, gid = ?, mode = ?, type = ?, ctime = ?, atime = ?, mtime = ?, name = ?, size = ?
+        where inode = ?`,
+		metadata.Uid, metadata.Gid, metadata.Mode, metadata.Type, metadata.Ctime,
+		metadata.Atime, metadata.Mtime, metadata.Name, metadata.Size, metadata.Inode,
+	)
+	if err != nil {
+		log.Println("Couldn't update data for metadata row!")
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println("Couldn't commit tx for metadata update!")
+		return err
+	}
+
+	return nil
+}
+
 func (d defaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([]int32, error) {
 	var childInodes []int32
 
@@ -173,8 +200,15 @@ func (d defaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([
 
 func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte, error) {
 	var data []byte
+	var size int64
 
-	err := db.QueryRow("select data from filedata where inode = ?", inode).Scan(&data)
+	err := db.QueryRow("select size from metadata where inode = ?", inode).Scan(&size)
+	if err != nil {
+		log.Println("Couldn't get metadata!")
+		return data, err
+	}
+
+	err = db.QueryRow("select data from filedata where inode = ?", inode).Scan(&data)
 	if err != nil {
 		log.Println("Couldn't get filedata!")
 		return data, err
@@ -199,7 +233,7 @@ func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 		return data, err
 	}
 
-	return data, nil
+	return data[:size], nil
 }
 
 func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []byte) error {

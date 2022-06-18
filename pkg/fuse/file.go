@@ -46,7 +46,6 @@ func (fh *FileHandle) Write(ctx context.Context, req *fuse.WriteRequest, res *fu
 	}
 
 	res.Size = len(req.Data)
-
 	return nil
 }
 
