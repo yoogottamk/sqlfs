@@ -27,11 +27,11 @@ umount mnt
 ![demo](./.images/demo.png)
 
 ## TODO
-- tests
 - docs
 - divide file contents into blocks
 - symlinks
 - `.`, `..` in directory listing (`cd ..` works but `.`, `..` aren't shown in `ls -a`)
+- more extensive tests [have basic e2e file and dir operations being tested right now, need to verify stuff at sql tables level]
 
 ^listed in the order of priority
 
