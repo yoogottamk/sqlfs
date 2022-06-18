@@ -3,7 +3,6 @@ package fuse
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -65,46 +64,83 @@ func testBasicFileOperations(t *testing.T, mnt *fstestutil.Mount) {
 	testfile := mountedDir + "/testfile"
 	initialContents := "Hello!"
 
-	// create file
-	err := ioutil.WriteFile(testfile, []byte(initialContents), fs.FileMode(0644))
-	if err != nil {
-		t.Fatalf("Couldn't write to file: %v", err)
-	}
+	t.Run("write", func(t *testing.T) {
+		if err := ioutil.WriteFile(testfile, []byte(initialContents), 0644); err != nil {
+			t.Fatalf("Couldn't write to file: %v", err)
+		}
 
-	assertFileSizeIs(t, testfile, int64(len(initialContents)))
+		assertFileSizeIs(t, testfile, int64(len(initialContents)))
+	})
 
-	// read from file
-	contents, err := ioutil.ReadFile(testfile)
-	if err != nil {
-		t.Fatalf("Couldn't read from file: %v", err)
-	}
-	if string(contents) != initialContents {
-		t.Fatalf("Wrong contents read from file")
-	}
+	t.Run("read", func(t *testing.T) {
+		contents, err := ioutil.ReadFile(testfile)
+		if err != nil {
+			t.Fatalf("Couldn't read from file: %v", err)
+		}
+		if string(contents) != initialContents {
+			t.Fatalf("Wrong contents read from file")
+		}
+	})
 
-	// append to file
-	f, err := os.OpenFile(testfile, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		t.Fatalf("Couldn't open file: %v", err)
-	}
-	if _, err = f.WriteString(initialContents); err != nil {
-		t.Fatalf("Couldn't write to file: %v", err)
-	}
-	if err = f.Close(); err != nil {
-		t.Fatalf("Couldn't close file: %v", err)
-	}
+	t.Run("append", func(t *testing.T) {
+		f, err := os.OpenFile(testfile, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			t.Fatalf("Couldn't open file: %v", err)
+		}
+		if _, err = f.WriteString(initialContents); err != nil {
+			t.Fatalf("Couldn't write to file: %v", err)
+		}
+		if err = f.Close(); err != nil {
+			t.Fatalf("Couldn't close file: %v", err)
+		}
 
-	// verify size
-	assertFileSizeIs(t, testfile, 2*int64(len(initialContents)))
+		// verify size
+		assertFileSizeIs(t, testfile, 2*int64(len(initialContents)))
+	})
 
-	// truncate file
-	err = os.Truncate(testfile, 0)
-	if err != nil {
-		t.Fatalf("Couldn't truncate file: %v", err)
-	}
+	t.Run("truncate", func(t *testing.T) {
+		err := os.Truncate(testfile, 0)
+		if err != nil {
+			t.Fatalf("Couldn't truncate file: %v", err)
+		}
 
-	// verify size
-	assertFileSizeIs(t, testfile, 0)
+		// verify size
+		assertFileSizeIs(t, testfile, 0)
+	})
+}
+
+func testBasicDirOperations(t *testing.T, mnt *fstestutil.Mount) {
+	mountedDir := mnt.Dir
+
+	t.Run("mkdir", func(t *testing.T) {
+		if err := os.MkdirAll(mountedDir+"/l1/l2/l3", 0755); err != nil {
+			t.Fatalf("Couldn't create nested dir: %v", err)
+		}
+	})
+
+	t.Run("rmdir", func(t *testing.T) {
+		if err := os.Remove(mountedDir + "/l1/l2/l3"); err != nil {
+			t.Fatalf("Couldn't remove dir: %v", err)
+		}
+	})
+
+	t.Run("mkfile", func(t *testing.T) {
+		if err := ioutil.WriteFile(mountedDir+"/l1/l2/testfile", []byte(""), 0644); err != nil {
+			t.Fatalf("Couldn't create file inside dir: %v", err)
+		}
+	})
+
+	t.Run("rmfile", func(t *testing.T) {
+		if err := os.Remove(mountedDir + "/l1/l2/testfile"); err != nil {
+			t.Fatalf("Couldn't remove file: %v", err)
+		}
+	})
+
+	t.Run("rmdir-r", func(t *testing.T) {
+		if err := os.RemoveAll(mountedDir + "/l1"); err != nil {
+			t.Fatalf("Couldn't remove dir: %v", err)
+		}
+	})
 }
 
 func setupMySQLContainer(t *testing.T) string {

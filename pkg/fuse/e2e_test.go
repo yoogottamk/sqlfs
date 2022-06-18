@@ -47,3 +47,15 @@ func TestBasicFileOperations(t *testing.T) {
 	}
 
 }
+
+func TestBasicDirectoryOperations(t *testing.T) {
+	for _, tc := range getTestingBackends(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			mnt := getMountedFS(t, tc.backend, tc.dsn)
+			defer mnt.Close()
+
+			testBasicDirOperations(t, mnt)
+		})
+	}
+
+}
