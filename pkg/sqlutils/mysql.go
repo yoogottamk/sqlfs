@@ -1,13 +1,13 @@
 package sqlutils
 
 import (
-	"database/sql"
 	_ "embed"
 	"log"
 	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	sql "github.com/jmoiron/sqlx"
 )
 
 type MySQLBackend struct{ defaultBackend }

@@ -1,9 +1,8 @@
 package fuse
 
 import (
-	"database/sql"
-
 	"bazil.org/fuse/fs"
+	sql "github.com/jmoiron/sqlx"
 )
 
 // filesystem

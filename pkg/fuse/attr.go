@@ -2,13 +2,13 @@ package fuse
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"os"
 	"time"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	sql "github.com/jmoiron/sqlx"
 
 	"github.com/yoogottamk/sqlfs/pkg/sqlutils"
 )

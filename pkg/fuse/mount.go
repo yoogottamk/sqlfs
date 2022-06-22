@@ -1,11 +1,11 @@
 package fuse
 
 import (
-	"database/sql"
 	"log"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	sql "github.com/jmoiron/sqlx"
 )
 
 func openDB(dsn string) (*sql.DB, error) {

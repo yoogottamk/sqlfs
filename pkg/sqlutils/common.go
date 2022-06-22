@@ -1,7 +1,6 @@
 package sqlutils
 
 import (
-	"database/sql"
 	"errors"
 	"log"
 	"os"
@@ -9,30 +8,31 @@ import (
 	"time"
 
 	"bazil.org/fuse"
+	sql "github.com/jmoiron/sqlx"
 )
 
 var AvaialableBackends = map[string]SQLBackend{
-	"sqlite": SQLiteBackend{},
-	"mysql":  MySQLBackend{},
-	// "postgres": PostgresBackend{},
+	"sqlite":   SQLiteBackend{},
+	"mysql":    MySQLBackend{},
+	"postgres": PostgresBackend{},
 }
 
 // metadata table as go struct
 type Metadata struct {
-	Inode int64
+	Inode int64 `db:"inode"`
 
-	Uid int64
-	Gid int64
+	Uid int64 `db:"uid"`
+	Gid int64 `db:"gid"`
 
-	Mode int64
-	Type int64
+	Mode int64 `db:"mode"`
+	Type int64 `db:"type"`
 
-	Ctime int64
-	Atime int64
-	Mtime int64
+	Ctime int64 `db:"ctime"`
+	Atime int64 `db:"atime"`
+	Mtime int64 `db:"mtime"`
 
-	Name string
-	Size int64
+	Name string `db:"name"`
+	Size int64  `db:"size"`
 }
 
 type SQLBackend interface {
@@ -69,7 +69,7 @@ type defaultBackend struct{}
 // TODO: do more extensive checks
 func (d defaultBackend) VerifyDB(db *sql.DB) error {
 	var rootName string
-	err := db.QueryRow("select name from metadata where inode = ?", 1).Scan(&rootName)
+	err := db.QueryRow(db.Rebind("select name from metadata where inode = ?"), 1).Scan(&rootName)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (d defaultBackend) VerifyDB(db *sql.DB) error {
 }
 
 func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for initial rows!")
 		return err
@@ -90,9 +90,10 @@ func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 
 	// add metadata entries for /
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = tx.Exec(`insert into
-        metadata(inode,uid,gid,mode,type,ctime,atime,mtime,name)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	_, err = tx.Exec(db.Rebind(
+		`insert into
+            metadata(inode,uid,gid,mode,type,ctime,atime,mtime,name)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
 		1, os.Getuid(), os.Getgid(), os.ModeDir|0755, fuse.DT_Dir, currentTimeNs, currentTimeNs, currentTimeNs, "",
 	)
 	if err != nil {
@@ -120,10 +121,10 @@ func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, 
 	var name string
 	var size int64
 
-	err := db.QueryRow(
+	err := db.QueryRow(db.Rebind(
 		`select
-        inode,uid,gid,mode,type,ctime,atime,mtime,name,size
-        from metadata where inode = ?`, inode,
+            inode,uid,gid,mode,type,ctime,atime,mtime,name,size
+            from metadata where inode = ?`), inode,
 	).Scan(&inode, &uid, &gid, &mode, &type_, &ctime, &atime, &mtime, &name, &size)
 	if err != nil {
 		log.Println("Coulnd't query select statement for Attr lookup")
@@ -145,14 +146,15 @@ func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, 
 }
 
 func (d defaultBackend) SetMetadataForInode(db *sql.DB, inode int32, metadata Metadata) error {
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for metadata update!")
 		return err
 	}
-	_, err = tx.Exec(`update metadata
-        set uid = ?, gid = ?, mode = ?, type = ?, ctime = ?, atime = ?, mtime = ?, name = ?, size = ?
-        where inode = ?`,
+	_, err = tx.Exec(db.Rebind(
+		`update metadata
+            set uid = ?, gid = ?, mode = ?, type = ?, ctime = ?, atime = ?, mtime = ?, name = ?, size = ?
+            where inode = ?`),
 		metadata.Uid, metadata.Gid, metadata.Mode, metadata.Type, metadata.Ctime,
 		metadata.Atime, metadata.Mtime, metadata.Name, metadata.Size, metadata.Inode,
 	)
@@ -173,7 +175,7 @@ func (d defaultBackend) SetMetadataForInode(db *sql.DB, inode int32, metadata Me
 func (d defaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([]int32, error) {
 	var childInodes []int32
 
-	rows, err := db.Query("select inode from parent where pinode = ?", inode)
+	rows, err := db.Query(db.Rebind("select inode from parent where pinode = ?"), inode)
 	if err != nil {
 		log.Println("Couldn't query parent table!")
 		return childInodes, err
@@ -202,26 +204,26 @@ func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 	var data []byte
 	var size int64
 
-	err := db.QueryRow("select size from metadata where inode = ?", inode).Scan(&size)
+	err := db.QueryRow(db.Rebind("select size from metadata where inode = ?"), inode).Scan(&size)
 	if err != nil {
 		log.Println("Couldn't get metadata!")
 		return data, err
 	}
 
-	err = db.QueryRow("select data from filedata where inode = ?", inode).Scan(&data)
+	err = db.QueryRow(db.Rebind("select data from filedata where inode = ?"), inode).Scan(&data)
 	if err != nil {
 		log.Println("Couldn't get filedata!")
 		return data, err
 	}
 
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for metadata update!")
 		return data, err
 	}
 
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = tx.Exec("update metadata set atime = ? where inode = ?", currentTimeNs, inode)
+	_, err = tx.Exec(db.Rebind("update metadata set atime = ? where inode = ?"), currentTimeNs, inode)
 	if err != nil {
 		log.Println("Couldn't update data for metadata row!")
 		return data, err
@@ -237,20 +239,20 @@ func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 }
 
 func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []byte) error {
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for filedata update!")
 		return err
 	}
 
-	_, err = tx.Exec("update filedata set data = ? where inode = ?", data, inode)
+	_, err = tx.Exec(db.Rebind("update filedata set data = ? where inode = ?"), data, inode)
 	if err != nil {
 		log.Println("Couldn't update data for filedata row!")
 		return err
 	}
 
 	var currentTimeNs = time.Now().UnixNano()
-	_, err = tx.Exec("update metadata set size = ?, mtime = ? where inode = ?", len(data), currentTimeNs, inode)
+	_, err = tx.Exec(db.Rebind("update metadata set size = ?, mtime = ? where inode = ?"), len(data), currentTimeNs, inode)
 	if err != nil {
 		log.Println("Couldn't update data for metadata row!")
 		return err
@@ -266,7 +268,7 @@ func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []
 }
 
 func (d defaultBackend) CreateDirUnderInode(db *sql.DB, inode int32, name string) (int32, error) {
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for mkdir!")
 		return 0, err
@@ -292,7 +294,7 @@ func (d defaultBackend) CreateDirUnderInode(db *sql.DB, inode int32, name string
 }
 
 func (d defaultBackend) CreateFileUnderInode(db *sql.DB, inode int32, name string) (int32, error) {
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for create file!")
 		return 0, err
@@ -303,7 +305,7 @@ func (d defaultBackend) CreateFileUnderInode(db *sql.DB, inode int32, name strin
 		return 0, err
 	}
 
-	_, err = tx.Exec("insert into filedata values (?, ?)", newFileInode, []byte(""))
+	_, err = tx.Exec(db.Rebind("insert into filedata values (?, ?)"), newFileInode, []byte(""))
 	if err != nil {
 		log.Println("Couldn't insert create file data rows!")
 		return 0, err
@@ -331,7 +333,7 @@ func (d defaultBackend) RemoveDirUnderInode(db *sql.DB, inode int32, name string
 	}
 
 	var nChildren int64
-	err = db.QueryRow("select count(*) from parent where pinode = ?", childInode).Scan(&nChildren)
+	err = db.QueryRow(db.Rebind("select count(*) from parent where pinode = ?"), childInode).Scan(&nChildren)
 	if err != nil {
 		log.Println("Couldn't retrive children for inode!")
 	}
@@ -340,7 +342,7 @@ func (d defaultBackend) RemoveDirUnderInode(db *sql.DB, inode int32, name string
 		return fuse.Errno(syscall.ENOTEMPTY)
 	}
 
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for dir removal!")
 		return err
@@ -374,7 +376,7 @@ func (d defaultBackend) RemoveFileUnderInode(db *sql.DB, inode int32, name strin
 		return err
 	}
 
-	tx, err := db.Begin()
+	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for file removal!")
 		return err
@@ -387,7 +389,7 @@ func (d defaultBackend) RemoveFileUnderInode(db *sql.DB, inode int32, name strin
 	}
 
 	// delete from filedata
-	_, err = tx.Exec("delete from filedata where inode = ?", childInode)
+	_, err = tx.Exec(db.Rebind("delete from filedata where inode = ?"), childInode)
 	if err != nil {
 		log.Println("Couldn't remove filedata rows!")
 		return err

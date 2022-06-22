@@ -162,49 +162,69 @@ func testBasicDirOperations(t *testing.T, mnt *fstestutil.Mount) {
 	})
 }
 
-func setupMySQLContainer(t *testing.T) string {
+func setupContainer(t *testing.T, image string, port nat.Port, env map[string]string, waitFor wait.Strategy) (string, string) {
 	ctx := context.Background()
 
-	user := "user"
-	password := "password"
-	dbname := "sqlfs"
-
 	req := testcontainers.ContainerRequest{
-		Image:        "mariadb:latest",
-		ExposedPorts: []string{"3306/tcp"},
-		Env: map[string]string{
-			"MARIADB_USER":                 user,
-			"MARIADB_PASSWORD":             password,
-			"MARIADB_DATABASE":             dbname,
-			"MARIADB_RANDOM_ROOT_PASSWORD": "yes",
-		},
-		// TODO: maybe use wait.ForSQL?
-		WaitingFor: wait.ForListeningPort(nat.Port("3306")),
+		Image:        image,
+		ExposedPorts: []string{string(port)},
+		Env:          env,
+		// WaitingFor:   wait.ForListeningPort(port),
+		WaitingFor: waitFor,
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
 	if err != nil {
-		t.Fatalf("Couldn't start mysql container: %v", err)
+		t.Fatalf("Couldn't start container: %v", err)
 	}
 
 	ip, err := container.Host(ctx)
 	if err != nil {
-		t.Fatalf("Couldn't get ip for mysql container: %v", err)
+		t.Fatalf("Couldn't get ip for container: %v", err)
 	}
 
-	mappedPort, err := container.MappedPort(ctx, "3306")
+	mappedPort, err := container.MappedPort(ctx, port)
 	if err != nil {
 		t.Fatalf("Couldn't get mapped port for mysql container: %v", err)
 	}
-
-	dsn := fmt.Sprintf("%s:%s@(%s:%s)/%s", user, password, ip, mappedPort.Port(), dbname)
 
 	// NOTE: not terminating container myself
 	// this was done to simplify the testing interface
 	//
 	// relying on testcontainer's reaper
 	// https://golang.testcontainers.org/features/garbage_collector/
-	return dsn
+	return ip, mappedPort.Port()
+}
+
+func setupMySQLContainer(t *testing.T) string {
+	user := "user"
+	password := "password"
+	dbname := "sqlfs"
+
+	port := nat.Port("3306/tcp")
+
+	ip, mappedPort := setupContainer(t, "mariadb:latest", port, map[string]string{
+		"MARIADB_USER":                 user,
+		"MARIADB_PASSWORD":             password,
+		"MARIADB_DATABASE":             dbname,
+		"MARIADB_RANDOM_ROOT_PASSWORD": "yes",
+	}, wait.ForListeningPort(port))
+
+	return fmt.Sprintf("%s:%s@(%s:%s)/%s", user, password, ip, mappedPort, dbname)
+}
+
+func setupPostgresContainer(t *testing.T) string {
+	user := "user"
+	password := "password"
+	dbname := "sqlfs"
+
+	ip, mappedPort := setupContainer(t, "postgres:latest", nat.Port("5432/tcp"), map[string]string{
+		"POSTGRES_USER":     user,
+		"POSTGRES_PASSWORD": password,
+		"POSTGRES_DB":       dbname,
+	}, wait.ForLog("database system is ready to accept connections"))
+
+	return fmt.Sprintf("%s:%s@%s:%s/%s", user, password, ip, mappedPort, dbname)
 }

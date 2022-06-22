@@ -1,6 +1,5 @@
-create sequence inode_seq;
 create table if not exists metadata (
-    inode bigint unique not null default nextval('inode_seq'),
+    inode serial primary key,
 
     uid   bigint not null,
     gid   bigint not null,
@@ -15,7 +14,6 @@ create table if not exists metadata (
     name  text    not null,
     size  bigint not null default 0
 );
-alter sequence inode_seq owned by metadata.inode;
 
 create table if not exists filedata (
     inode  bigint unique not null,

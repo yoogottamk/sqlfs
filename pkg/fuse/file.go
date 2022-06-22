@@ -2,11 +2,11 @@ package fuse
 
 import (
 	"context"
-	"database/sql"
 	"log"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	sql "github.com/jmoiron/sqlx"
 )
 
 type FileHandle struct {

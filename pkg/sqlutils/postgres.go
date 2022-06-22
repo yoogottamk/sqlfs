@@ -1,10 +1,10 @@
 package sqlutils
 
 import (
-	"database/sql"
 	_ "embed"
 	"log"
 
+	sql "github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
@@ -16,7 +16,6 @@ var _ SQLBackend = (*MySQLBackend)(nil)
 var createTablePostgres string
 
 func (p PostgresBackend) OpenDB(dsn string) (*sql.DB, error) {
-	log.Fatalln("PostgresBackend not supported")
 	return sql.Open("postgres", "postgres://"+dsn+"?sslmode=disable")
 }
 

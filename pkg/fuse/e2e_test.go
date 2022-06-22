@@ -24,6 +24,11 @@ func getTestingBackends(t *testing.T) []backendTestSpec {
 			backend: sqlutils.MySQLBackend{},
 			name:    "mysql",
 		},
+		{
+			dsn:     setupPostgresContainer(t),
+			backend: sqlutils.PostgresBackend{},
+			name:    "postgres",
+		},
 	}
 }
 
