@@ -53,11 +53,10 @@ docker run --rm -it --name sqlfs-mariadb \
     mariadb:latest
 
 mkdir mnt
-sqlfs init -u mysql://user:password@/sqlfs mnt
+sqlfs init -u mysql://user:password@/sqlfs
 sqlfs mount -u mysql://user:password@/sqlfs mnt
 ```
 
-<!--
 ### Postgres
 ```sh
 docker run --rm -it --name sqlfs-postgres \
@@ -68,10 +67,9 @@ docker run --rm -it --name sqlfs-postgres \
     postgres:latest
 
 mkdir mnt
-sqlfs init -u postgres://user:password@localhost:5432/sqlfs mnt
+sqlfs init -u postgres://user:password@localhost:5432/sqlfs
 sqlfs mount -u postgres://user:password@localhost:5432/sqlfs mnt
 ```
--->
 
 ## Note
 I'm new with golang and fuse and this is my first big-ish project in this language. The code might have bugs and definitely has performance issues (e.g. [loading the entire file into memory during read](https://github.com/yoogottamk/sqlfs/blob/51f11243ba9bc02af95bf92438852385d262325f/sqlutils/common.go#L161-L163)). There was one time in early development when I called [`InvalidateEntry`](https://pkg.go.dev/bazil.org/fuse@v0.0.0-20200524192727-fb710f7dfd05#Conn.InvalidateEntry) with some arguments and had to reboot my laptop in order to get it to work again (no such inconvenience was experienced after that).

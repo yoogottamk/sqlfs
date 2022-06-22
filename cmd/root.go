@@ -37,6 +37,8 @@ Available backends: %s
         user:password@/sqlfs
 
     More information can be found here: https://github.com/go-sql-driver/mysql
+
+* DSN for postgres: username:password@address/dbname
 `,
 		availableBackends),
 }
