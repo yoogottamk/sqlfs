@@ -15,10 +15,12 @@ var _ SQLBackend = (*MySQLBackend)(nil)
 //go:embed init-postgres.sql
 var createTablePostgres string
 
+// OpenDB connects to dsn
 func (p PostgresBackend) OpenDB(dsn string) (*sql.DB, error) {
 	return sql.Open("postgres", "postgres://"+dsn+"?sslmode=disable")
 }
 
+// CreateDBTables creates db tables using sql file
 func (p PostgresBackend) CreateDBTables(db *sql.DB) error {
 	_, err := db.Exec(createTablePostgres)
 	if err != nil {

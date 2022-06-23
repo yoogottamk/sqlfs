@@ -9,6 +9,8 @@ import (
 )
 
 // mountCmd represents the mount command
+//
+// Mounts the fuse fs after verification
 var mountCmd = &cobra.Command{
 	Use:   "mount [flags] MOUNTPOINT",
 	Short: "Mount the FUSE fs",

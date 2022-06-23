@@ -16,6 +16,8 @@ import (
 var _ fs.Node = (*Dir)(nil)
 var _ fs.Node = (*File)(nil)
 
+// setAttrFromMetadata populates the fuse attr object with details fetched from
+// db for the given inode
 func setAttrFromMetadata(db *sql.DB, inode int32, attr *fuse.Attr) error {
 	metadata, err := Backend.GetMetadataForInode(db, inode)
 	if err != nil {
@@ -34,11 +36,13 @@ func setAttrFromMetadata(db *sql.DB, inode int32, attr *fuse.Attr) error {
 	return nil
 }
 
+// Attr retrieves metadata attr for dir
 func (d *Dir) Attr(ctx context.Context, attr *fuse.Attr) (err error) {
 	err = setAttrFromMetadata(d.db, d.inode, attr)
 	return
 }
 
+// Attr retrieves metadata attr for file
 func (f *File) Attr(ctx context.Context, attr *fuse.Attr) (err error) {
 	err = setAttrFromMetadata(f.db, f.inode, attr)
 	return
@@ -47,6 +51,9 @@ func (f *File) Attr(ctx context.Context, attr *fuse.Attr) (err error) {
 var _ fs.NodeSetattrer = (*File)(nil)
 var _ fs.NodeSetattrer = (*File)(nil)
 
+// handleSetattrRequest generates the Metadata struct based on attributes
+// from setattr req for a given inode. It loads the current values from db
+// and returns the updated Metadata
 func handleSetattrRequest(db *sql.DB, inode int32, req *fuse.SetattrRequest) (sqlutils.Metadata, error) {
 	metadata, err := Backend.GetMetadataForInode(db, inode)
 	if err != nil {
@@ -94,20 +101,7 @@ func handleSetattrRequest(db *sql.DB, inode int32, req *fuse.SetattrRequest) (sq
 	return metadata, nil
 }
 
-func (f *File) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.SetattrResponse) error {
-	metadata, err := handleSetattrRequest(f.db, f.inode, req)
-	if err != nil {
-		return err
-	}
-
-	if err := Backend.SetMetadataForInode(f.db, f.inode, metadata); err != nil {
-		log.Println("Failed to set metadata in setattr!")
-		return err
-	}
-
-	return nil
-}
-
+// Setattr updates the metadata table on db based on req
 func (d *Dir) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.SetattrResponse) error {
 	metadata, err := handleSetattrRequest(d.db, d.inode, req)
 	if err != nil {
@@ -117,6 +111,21 @@ func (d *Dir) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.S
 	metadata.Mode ^= int64(os.ModeDir)
 
 	if err := Backend.SetMetadataForInode(d.db, d.inode, metadata); err != nil {
+		log.Println("Failed to set metadata in setattr!")
+		return err
+	}
+
+	return nil
+}
+
+// Setattr updates the metadata table on db based on req
+func (f *File) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.SetattrResponse) error {
+	metadata, err := handleSetattrRequest(f.db, f.inode, req)
+	if err != nil {
+		return err
+	}
+
+	if err := Backend.SetMetadataForInode(f.db, f.inode, metadata); err != nil {
 		log.Println("Failed to set metadata in setattr!")
 		return err
 	}

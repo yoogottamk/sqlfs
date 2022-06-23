@@ -11,6 +11,7 @@ import (
 // directory read
 var _ = fs.HandleReadDirAller(&Dir{})
 
+// ReadDirAll returns all entries in the Dir d
 func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	var ret []fuse.Dirent
 
@@ -42,6 +43,7 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 // directory lookup
 var _ = fs.NodeRequestLookuper(&Dir{})
 
+// Lookup performs a directory lookup in Dir d based on name
 func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, res *fuse.LookupResponse) (fs.Node, error) {
 	path := req.Name
 
@@ -77,6 +79,7 @@ func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, res *fuse.Loo
 
 var _ = fs.NodeMkdirer(&Dir{})
 
+// Mkdir creates a directory under Dir d
 func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error) {
 	inode, err := Backend.CreateDirUnderInode(d.db, d.inode, req.Name)
 	if err != nil {
@@ -89,6 +92,7 @@ func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error
 
 var _ = fs.NodeCreater(&Dir{})
 
+// Create creates a file under Dir d
 func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, res *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
 	// TODO: umask, flags, mode
 	var f File
@@ -107,6 +111,7 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, res *fuse.Cre
 
 var _ = fs.NodeRemover(&Dir{})
 
+// Remove removes a directory or file based on req under Dir d
 func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 	var err error
 

@@ -17,6 +17,7 @@ var _ SQLBackend = (*MySQLBackend)(nil)
 //go:embed init-mysql.sql
 var createTableMySql string
 
+// OpenDB enables multiStatements and connects to dsn
 func (m MySQLBackend) OpenDB(dsn string) (*sql.DB, error) {
 	var querySep string
 
@@ -40,6 +41,7 @@ func (m MySQLBackend) OpenDB(dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
+// CreateDBTables creates db tables using sql file
 func (m MySQLBackend) CreateDBTables(db *sql.DB) error {
 	_, err := db.Exec(createTableMySql)
 	if err != nil {

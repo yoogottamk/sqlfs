@@ -27,7 +27,6 @@ umount mnt
 ![demo](./.images/demo.png)
 
 ## TODO
-- docs
 - divide file contents into blocks
 - symlinks
 - figure out logging

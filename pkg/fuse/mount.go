@@ -8,6 +8,7 @@ import (
 	sql "github.com/jmoiron/sqlx"
 )
 
+// openDB opens the DB. Caller package must set the Backend
 func openDB(dsn string) (*sql.DB, error) {
 	db, err := Backend.OpenDB(dsn)
 	if err != nil {
@@ -18,6 +19,8 @@ func openDB(dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
+// InitializeDB creates the tables and initial rows necessary for
+// the fs to function
 func InitializeDB(dsn string) error {
 	db, err := openDB(dsn)
 	if err != nil {
@@ -37,6 +40,7 @@ func InitializeDB(dsn string) error {
 	return nil
 }
 
+// VerifyDB is just a wrapper over Backend's VerifyDB function
 func VerifyDB(dsn string) error {
 	db, err := openDB(dsn)
 	if err != nil {
@@ -51,6 +55,7 @@ func VerifyDB(dsn string) error {
 	return nil
 }
 
+// MountFS verifies the db state and mounts the fuse fs at mountpoint
 func MountFS(dsn, mountpoint string) error {
 	// verify whether its usable
 	if err := VerifyDB(dsn); err != nil {

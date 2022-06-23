@@ -17,7 +17,7 @@ var AvaialableBackends = map[string]SQLBackend{
 	"postgres": PostgresBackend{},
 }
 
-// metadata table as go struct
+// Metadata table as go struct
 type Metadata struct {
 	Inode int64 `db:"inode"`
 
@@ -63,7 +63,7 @@ type SQLBackend interface {
 
 type defaultBackend struct{}
 
-// Pretty basic check for whether the necessary tables were created.
+// VerifyDB does pretty basic check for whether the necessary tables were created.
 // This check might pass and later operations still might fail.
 //
 // TODO: do more extensive checks
@@ -81,6 +81,9 @@ func (d defaultBackend) VerifyDB(db *sql.DB) error {
 	return nil
 }
 
+// InitializeDBRows creates the necessary rows for fs to function
+//
+// Currently, only root metadata is setup
 func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 	tx, err := db.Beginx()
 	if err != nil {
@@ -110,41 +113,24 @@ func (d defaultBackend) InitializeDBRows(db *sql.DB) error {
 	return nil
 }
 
+// GetMetadataForInode retrieves metadata for a given inode from db
 func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, error) {
-	var uid int64
-	var gid int64
-	var mode int64
-	var type_ int64
-	var ctime int64
-	var atime int64
-	var mtime int64
-	var name string
-	var size int64
+	var metadata Metadata
 
-	err := db.QueryRow(db.Rebind(
+	err := db.QueryRowx(db.Rebind(
 		`select
             inode,uid,gid,mode,type,ctime,atime,mtime,name,size
             from metadata where inode = ?`), inode,
-	).Scan(&inode, &uid, &gid, &mode, &type_, &ctime, &atime, &mtime, &name, &size)
+	).StructScan(&metadata)
 	if err != nil {
 		log.Println("Coulnd't query select statement for Attr lookup")
 		return Metadata{}, err
 	}
 
-	return Metadata{
-		Inode: int64(inode),
-		Uid:   uid,
-		Gid:   gid,
-		Mode:  mode,
-		Type:  type_,
-		Ctime: ctime,
-		Atime: atime,
-		Mtime: mtime,
-		Name:  name,
-		Size:  size,
-	}, nil
+	return metadata, nil
 }
 
+// SetMetadataForInode updates metadata for inode on db
 func (d defaultBackend) SetMetadataForInode(db *sql.DB, inode int32, metadata Metadata) error {
 	tx, err := db.Beginx()
 	if err != nil {
@@ -172,6 +158,7 @@ func (d defaultBackend) SetMetadataForInode(db *sql.DB, inode int32, metadata Me
 	return nil
 }
 
+// GetDirectoryContentsForInode returns all children of inode from db
 func (d defaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([]int32, error) {
 	var childInodes []int32
 
@@ -200,6 +187,9 @@ func (d defaultBackend) GetDirectoryContentsForInode(db *sql.DB, inode int32) ([
 	return childInodes, nil
 }
 
+// GetFileContentsForInode reads file contents for inode from db
+//
+// TODO: split contents into blocks
 func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte, error) {
 	var data []byte
 	var size int64
@@ -238,6 +228,7 @@ func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 	return data[:size], nil
 }
 
+// SetFileContentsForInode updates file content for inode on db
 func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []byte) error {
 	tx, err := db.Beginx()
 	if err != nil {
@@ -267,6 +258,7 @@ func (d defaultBackend) SetFileContentsForInode(db *sql.DB, inode int32, data []
 	return nil
 }
 
+// CreateDirUnderInode creates a Dir named name under directory referred to by inode
 func (d defaultBackend) CreateDirUnderInode(db *sql.DB, inode int32, name string) (int32, error) {
 	tx, err := db.Beginx()
 	if err != nil {
@@ -293,6 +285,7 @@ func (d defaultBackend) CreateDirUnderInode(db *sql.DB, inode int32, name string
 	return int32(newDirInode), nil
 }
 
+// CreateFileUnderInode creates a File named name under directory referred to by inode
 func (d defaultBackend) CreateFileUnderInode(db *sql.DB, inode int32, name string) (int32, error) {
 	tx, err := db.Beginx()
 	if err != nil {
@@ -325,6 +318,7 @@ func (d defaultBackend) CreateFileUnderInode(db *sql.DB, inode int32, name strin
 	return int32(newFileInode), nil
 }
 
+// RemoveDirUnderInode removes Dir named name from  directory referred to by inode
 func (d defaultBackend) RemoveDirUnderInode(db *sql.DB, inode int32, name string) error {
 	childInode, err := getInodeFromNameUnderDir(db, inode, name)
 	if err != nil {
@@ -369,6 +363,7 @@ func (d defaultBackend) RemoveDirUnderInode(db *sql.DB, inode int32, name string
 	return nil
 }
 
+// RemoveFileUnderInode removes File named name from  directory referred to by inode
 func (d defaultBackend) RemoveFileUnderInode(db *sql.DB, inode int32, name string) error {
 	childInode, err := getInodeFromNameUnderDir(db, inode, name)
 	if err != nil {

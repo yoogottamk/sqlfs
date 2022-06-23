@@ -9,6 +9,8 @@ import (
 )
 
 // initCmd represents the init command
+//
+// Initializes sql db (creates necessary tables and rows)
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize the SQL db",

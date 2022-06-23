@@ -8,6 +8,8 @@ import (
 	sql "github.com/jmoiron/sqlx"
 )
 
+// getInodeFromNameUnderDir returns the inode of Dir/File under directory
+// referred by parentInode from db
 func getInodeFromNameUnderDir(db *sql.DB, parentInode int32, name string) (int32, error) {
 	var childInode int64
 	err := db.QueryRow(db.Rebind(
@@ -24,6 +26,7 @@ func getInodeFromNameUnderDir(db *sql.DB, parentInode int32, name string) (int32
 	return int32(childInode), nil
 }
 
+// insertIntoMetadata creates a metadata tbale row given mode, type_ and name
 func insertIntoMetadata(tx *sql.Tx, mode, type_ int64, name string) (int32, error) {
 	var inode int64
 	// all backends don't provide LastInsertId
@@ -44,6 +47,7 @@ func insertIntoMetadata(tx *sql.Tx, mode, type_ int64, name string) (int32, erro
 	return int32(inode), nil
 }
 
+// insertIntoParent creates a parent table row given parentInode and childInode
 func insertIntoParent(tx *sql.Tx, parentInode, childInode int64) error {
 	_, err := tx.Exec(tx.Rebind("insert into parent values (?, ?)"), parentInode, childInode)
 	if err != nil {
@@ -54,6 +58,7 @@ func insertIntoParent(tx *sql.Tx, parentInode, childInode int64) error {
 	return nil
 }
 
+// removeFromMetadata removes row with inode from metadata table
 func removeFromMetadata(tx *sql.Tx, inode int64) error {
 	_, err := tx.Exec(tx.Rebind("delete from metadata where inode = ?"), inode)
 	if err != nil {
@@ -64,6 +69,10 @@ func removeFromMetadata(tx *sql.Tx, inode int64) error {
 	return nil
 }
 
+// removeFromParent removes row with parentInode,childInode from parent table
+//
+// NOTE: this should never actually be required since foreign key ON DELETE should
+//       take care of this
 func removeFromParent(tx *sql.Tx, parentInode, childInode int64) error {
 	_, err := tx.Exec(tx.Rebind("delete from parent where pinode = ? and inode = ?"),
 		parentInode, childInode)

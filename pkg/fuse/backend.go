@@ -2,5 +2,5 @@ package fuse
 
 import "github.com/yoogottamk/sqlfs/pkg/sqlutils"
 
-// set from outside
+// Backend should set from outside. No defaults
 var Backend sqlutils.SQLBackend
