@@ -252,7 +252,7 @@ func setupPostgresContainer(t *testing.T) string {
 		"POSTGRES_USER":     user,
 		"POSTGRES_PASSWORD": password,
 		"POSTGRES_DB":       dbname,
-	}, wait.ForLog("database system is ready to accept connections"))
+	}, wait.ForLog("[1] LOG:  database system is ready to accept connections"))
 
 	return fmt.Sprintf("%s:%s@%s:%s/%s", user, password, ip, mappedPort, dbname)
 }
