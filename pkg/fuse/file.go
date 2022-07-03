@@ -24,12 +24,10 @@ var _ = fs.HandleWriter(&FileHandle{})
 //
 // NOTE: this is in a very bad state currently, need
 //       to split the file into blocks to make it better
-// NOTE: this fails miserably if size according to metadata
-//       is bigger than actual contents
 func (fh *FileHandle) Read(ctx context.Context, req *fuse.ReadRequest, res *fuse.ReadResponse) error {
 	data, err := Backend.GetFileContentsForInode(fh.db, fh.inode)
 	if err != nil {
-		log.Println("Couldn't read file contents!")
+		log.Printf("Couldn't read file contents: %v\n", err)
 		return err
 	}
 

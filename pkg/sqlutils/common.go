@@ -225,7 +225,10 @@ func (d defaultBackend) GetFileContentsForInode(db *sql.DB, inode int32) ([]byte
 		return data, err
 	}
 
-	return data[:size], nil
+	filecontents := make([]byte, size)
+	copy(filecontents, data)
+
+	return filecontents, nil
 }
 
 // SetFileContentsForInode updates file content for inode on db

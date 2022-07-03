@@ -51,10 +51,10 @@ func (f *File) Attr(ctx context.Context, attr *fuse.Attr) (err error) {
 var _ fs.NodeSetattrer = (*File)(nil)
 var _ fs.NodeSetattrer = (*File)(nil)
 
-// handleSetattrRequest generates the Metadata struct based on attributes
+// getUpdatedMetadataForSetattr generates the Metadata struct based on attributes
 // from setattr req for a given inode. It loads the current values from db
 // and returns the updated Metadata
-func handleSetattrRequest(db *sql.DB, inode int32, req *fuse.SetattrRequest) (sqlutils.Metadata, error) {
+func getUpdatedMetadataForSetattr(db *sql.DB, inode int32, req *fuse.SetattrRequest) (sqlutils.Metadata, error) {
 	metadata, err := Backend.GetMetadataForInode(db, inode)
 	if err != nil {
 		log.Println("Couldn't get metadata for setattr!")
@@ -91,6 +91,21 @@ func handleSetattrRequest(db *sql.DB, inode int32, req *fuse.SetattrRequest) (sq
 	}
 
 	if req.Valid.Size() {
+		// update the file contents if new size is smaller
+		// if truncate to 0 then N happens, the file contents should be null
+		// if we dont update the contents now, it will show the old contents instead
+		if req.Size < uint64(metadata.Size) {
+			filedata, err := Backend.GetFileContentsForInode(db, inode)
+			if err != nil {
+				log.Printf("Couldn't retrieve file contents: %v\n", err)
+				return metadata, err
+			}
+			err = Backend.SetFileContentsForInode(db, inode, filedata[:req.Size])
+			if err != nil {
+				log.Printf("Couldn't set file contents: %v\n", err)
+			}
+		}
+
 		metadata.Size = int64(req.Size)
 	}
 
@@ -103,7 +118,7 @@ func handleSetattrRequest(db *sql.DB, inode int32, req *fuse.SetattrRequest) (sq
 
 // Setattr updates the metadata table on db based on req
 func (d *Dir) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.SetattrResponse) error {
-	metadata, err := handleSetattrRequest(d.db, d.inode, req)
+	metadata, err := getUpdatedMetadataForSetattr(d.db, d.inode, req)
 	if err != nil {
 		return err
 	}
@@ -120,7 +135,7 @@ func (d *Dir) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.S
 
 // Setattr updates the metadata table on db based on req
 func (f *File) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.SetattrResponse) error {
-	metadata, err := handleSetattrRequest(f.db, f.inode, req)
+	metadata, err := getUpdatedMetadataForSetattr(f.db, f.inode, req)
 	if err != nil {
 		return err
 	}
