@@ -17,6 +17,8 @@ var AvaialableBackends = map[string]SQLBackend{
 	"postgres": PostgresBackend{},
 }
 
+var DEBUG_MODE_CHANGES = false
+
 // Metadata table as go struct
 type Metadata struct {
 	Inode int64 `db:"inode"`
@@ -122,9 +124,18 @@ func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, 
             inode,uid,gid,mode,type,ctime,atime,mtime,name,size
             from metadata where inode = ?`), inode,
 	).StructScan(&metadata)
+
+	//set bits expected by fuse if is dir
+	if metadata.Type == 4 {
+		metadata.Mode |= int64(os.ModeDir)
+	}
+
 	if err != nil {
 		log.Println("Coulnd't query select statement for Attr lookup")
 		return Metadata{}, err
+	}
+	if DEBUG_MODE_CHANGES {
+		log.Println("giving mode: ", metadata.Mode)
 	}
 
 	return metadata, nil
@@ -132,6 +143,14 @@ func (d defaultBackend) GetMetadataForInode(db *sql.DB, inode int32) (Metadata, 
 
 // SetMetadataForInode updates metadata for inode on db
 func (d defaultBackend) SetMetadataForInode(db *sql.DB, inode int32, metadata Metadata) error {
+
+	//strip mode out when placed in DB
+	metadata.Mode &^= int64(os.ModeType)
+
+	if DEBUG_MODE_CHANGES {
+		log.Println("saving mode: ", metadata.Mode)
+	}
+
 	tx, err := db.Beginx()
 	if err != nil {
 		log.Println("Couldn't prepare tx for metadata update!")

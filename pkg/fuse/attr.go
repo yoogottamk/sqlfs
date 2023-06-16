@@ -123,8 +123,6 @@ func (d *Dir) Setattr(ctx context.Context, req *fuse.SetattrRequest, res *fuse.S
 		return err
 	}
 
-	metadata.Mode ^= int64(os.ModeDir)
-
 	if err := Backend.SetMetadataForInode(d.db, d.inode, metadata); err != nil {
 		log.Println("Failed to set metadata in setattr!")
 		return err
